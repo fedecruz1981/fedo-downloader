@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+sidecar/__pycache__/
+sidecar/.venv/
+
+# Build outputs
+dist/
+build/
+*.local
+
+# Electron
+electron/main.js
+electron/preload.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
