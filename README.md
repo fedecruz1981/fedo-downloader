@@ -2,6 +2,16 @@
 
 Aplicación de escritorio para descargar audio de YouTube, organizarlo y editarlo inline.
 
+## Descargas
+
+Portable para Windows (x64): un solo `.exe`, no se instala.
+
+| Versión | Archivo | Tamaño |
+|---------|---------|--------|
+| [1.0.1](https://github.com/fedecruz1981/fedo-downloader/releases/tag/v1.0.1) | `YTAudio.Studio.1.0.1.exe` | 96,3 MB |
+
+[Todas las releases](https://github.com/fedecruz1981/fedo-downloader/releases) · [reportar un problema](https://github.com/fedecruz1981/fedo-downloader/issues)
+
 ## Características
 
 - **Descarga de YouTube**: Pega URLs y descarga audio en MP3, WAV o FLAC
