@@ -59,11 +59,12 @@ jobs:
         run: npm run lint -- --quiet
 
       - name: Compilar portable
-        # El build termina en electron-builder, que con un tag presente intenta
-        # publicar la release por su cuenta y falla porque en este paso todavia
-        # no hay GH_TOKEN. --publish never deja la publicacion en el paso de
-        # abajo, que es el unico dueño del release.
-        run: npm run build:renderer && npm run compile:electron && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never
+        # El shell del runner no resuelve node_modules/.bin por si mismo, asi
+        # que cross-env se invoca con npx. Con un tag presente, electron-builder
+        # intenta publicar la release por su cuenta y falla porque en este paso
+        # todavia no hay GH_TOKEN. --publish never deja la publicacion en el
+        # paso de abajo, que es el unico dueño del release.
+        run: npm run build:renderer && npm run compile:electron && npx cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never
 
       - name: Publicar release
         shell: bash
