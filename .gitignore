@@ -5,6 +5,7 @@ sidecar/.venv/
 
 # Build outputs
 dist/
+release/
 build/
 *.local
 

@@ -74,7 +74,8 @@
       "useZip": false
     },
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "release"
     }
   }
 }
