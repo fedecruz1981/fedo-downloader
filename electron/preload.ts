@@ -93,6 +93,11 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   showSaveDialog: (options: any) => ipcRenderer.invoke('show-save-dialog', options),
 
+  // First-run doctor
+  getDoctor: () => ipcRenderer.invoke('doctor:get'),
+  onDoctorReport: (callback: (report: any) => void) => subscribe('doctor:report', callback),
+  onSidecarStatus: (callback: (status: any) => void) => subscribe('sidecar:status', callback),
+
   // Eventos push del main process (retornan función de cleanup).
   // El listener se guarda en una constante porque off() compara por
   // referencia: pasar una arrow nueva en el cleanup no quita nada y los

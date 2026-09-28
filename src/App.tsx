@@ -6,6 +6,7 @@ import { UrlInputBar } from '@/components/download/UrlInputBar'
 import { DownloadQueue } from '@/components/download/DownloadQueue'
 import { EditorPanel } from '@/components/editor/EditorPanel'
 import { ToastContainer } from '@/components/shared/Toast'
+import { DoctorBanner } from '@/components/shared/DoctorBanner'
 import { useStore } from '@/state/store'
 import { api } from '@/hooks/useApi'
 
@@ -90,6 +91,7 @@ export function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
+      <DoctorBanner />
       <header className="h-12 px-4 flex items-center justify-between border-b border-fedo-border bg-fedo-surface/80 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-mono font-bold text-fedo-primary tracking-tight">

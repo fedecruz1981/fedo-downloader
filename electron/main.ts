@@ -109,6 +109,96 @@ let isQuitting = false
 const pendingAnalysis = new Map<string, (result: any) => void>()
 const pendingRender = new Map<string, (result: any) => void>()
 
+// Estado del "first-run doctor": detecta Python, yt-dlp y FFmpeg
+export type ToolStatus = 'ok' | 'missing' | 'broken'
+export interface ToolCheck {
+  id: string
+  label: string
+  required: boolean
+  status: ToolStatus
+  version: string | null
+  message: string
+  hint: string | null
+}
+export interface DoctorReport {
+  ok: boolean
+  sidecarState: 'starting' | 'ready' | 'errored'
+  sidecarError: string | null
+  checks: ToolCheck[]
+}
+let lastSidecarDoctor: ToolCheck[] | null = null
+let sidecarState: DoctorReport['sidecarState'] = 'starting'
+let sidecarStderrTail: string[] = []
+let sidecarRestarts = 0
+const MAX_SIDECAR_RESTARTS = 3
+
+/**
+ * Ejecuta --version de un binario y devuelve { ok, version }.
+ * Captura stdout y stderr (python imprime la versión a stderr según la build).
+ */
+function probeVersion(cmd: string, args: string[]): Promise<{ ok: boolean; version: string | null }> {
+  return new Promise((resolve) => {
+    let child: ChildProcess
+    try {
+      child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch {
+      resolve({ ok: false, version: null })
+      return
+    }
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve({ ok: false, version: null })
+    }, 8000)
+    let out = ''
+    child.stdout?.on('data', (d) => { out += d.toString() })
+    child.stderr?.on('data', (d) => { out += d.toString() })
+    child.on('error', () => {
+      clearTimeout(timer)
+      resolve({ ok: false, version: null })
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      const first = out.trim().split(/\r?\n/)[0] || null
+      resolve({ ok: code === 0, version: first })
+    })
+  })
+}
+
+/**
+ * Compila el reporte del doctor: sondea Python desde el main y completa con
+ * el reporte que envía el sidecar (yt-dlp, ffmpeg, ffprobe). Si el sidecar
+ * murió antes de reportar, el banner explica la causa.
+ */
+async function buildDoctorReport(): Promise<DoctorReport> {
+  const checks: ToolCheck[] = []
+  const python = await probeVersion('python', ['--version'])
+  checks.push({
+    id: 'python',
+    label: 'Python',
+    required: true,
+    status: python.ok ? 'ok' : 'missing',
+    version: python.version,
+    message: python.ok
+      ? 'Python disponible para el sidecar de descarga.'
+      : 'Python no está instalado o no está en el PATH. Sin él la app no puede descargar ni analizar audio.',
+    hint: python.ok ? null : 'https://www.python.org/downloads/',
+  })
+  if (lastSidecarDoctor) {
+    for (const c of lastSidecarDoctor) {
+      if (c.id !== 'python') checks.push(c)
+    }
+  }
+  const ok = checks.every((c) => c.status === 'ok')
+  return { ok, sidecarState, sidecarError: null, checks }
+}
+
+/** Difunde el reporte actual del doctor al renderer. */
+async function pushDoctor() {
+  if (!mainWindow) return
+  const report = await buildDoctorReport()
+  mainWindow.webContents.send('doctor:report', report)
+}
+
 // Detecta si estamos en desarrollo (Vite dev server) o producción
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -157,9 +247,11 @@ function createWindow() {
 function startSidecar() {
   const sidecarPath = isDev
     ? join(__dirname, '../sidecar/main.py')
-    : join(process.resourcesPath, 'app', 'sidecar', 'main.py')
+    : join(process.resourcesPath, 'sidecar', 'main.py')
 
   const pythonCmd = process.platform === 'win32' ? 'python.exe' : 'python3'
+  sidecarState = 'starting'
+  sidecarStderrTail = []
 
   sidecarProcess = spawn(pythonCmd, [sidecarPath], {
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -180,31 +272,69 @@ function startSidecar() {
     }
   })
 
+  // Guarda la cola de stderr para poder reportarla en el doctor
   sidecarProcess.stderr?.on('data', (data) => {
-    console.error('Sidecar stderr:', data.toString())
+    const msg = data.toString().trim()
+    if (!msg) return
+    console.error('Sidecar stderr:', msg)
+    sidecarStderrTail.push(msg)
+    if (sidecarStderrTail.length > 6) sidecarStderrTail.shift()
   })
 
-  sidecarProcess.on('error', (err) => {
+  sidecarProcess.on('error', (err: NodeJS.ErrnoException) => {
     console.error('Sidecar process error:', err)
+    sidecarProcess = null
+    sidecarState = 'errored'
+    // ENOENT = python no está; EACCES = bloqueado por SmartScreen/antivirus
+    const reason = err.code === 'ENOENT' ? 'Python no está instalado o no está en el PATH.'
+      : err.code === 'EACCES' ? 'Windows bloqueó el acceso a Python (SmartScreen o antivirus).'
+      : err.message
+    mainWindow?.webContents.send('sidecar:status', { state: 'errored', message: reason })
+    pushDoctor()
   })
 
-  // Reintenta reiniciar el sidecar si muere inesperadamente
+  // Reintenta reiniciar el sidecar si muere inesperadamente, con tope.
   sidecarProcess.on('exit', (code) => {
     console.log(`Sidecar exited with code ${code}`)
     sidecarProcess = null
-    if (!isQuitting) {
+    if (isQuitting) return
+    if (sidecarState === 'ready') {
+      sidecarState = 'errored'
+      sidecarRestarts = 0
+      const trace = sidecarStderrTail.join('\n')
+      const message = trace
+        ? `El sidecar terminó tras arrancar (código ${code}). ${trace.split('\n')[0]}`
+        : `El sidecar terminó de forma inesperada (código ${code}).`
+      mainWindow?.webContents.send('sidecar:status', { state: 'errored', message })
+      pushDoctor()
+      return
+    }
+    sidecarRestarts++
+    if (sidecarRestarts <= MAX_SIDECAR_RESTARTS) {
+      console.log(`Reintentando sidecar (${sidecarRestarts}/${MAX_SIDECAR_RESTARTS})`)
       setTimeout(startSidecar, 1000)
+    } else {
+      sidecarState = 'errored'
+      const trace = sidecarStderrTail.join('\n')
+      const message = trace
+        ? `El sidecar no pudo iniciar. ${trace.split('\n')[0]}`
+        : `El sidecar no pudo iniciar (código ${code}). Comprobá que Python y sus dependencias estén instaladas.`
+      mainWindow?.webContents.send('sidecar:status', { state: 'errored', message })
+      pushDoctor()
     }
   })
 }
 
 /**
- * Envía un comando al sidecar Python via stdin
+ * Envía un comando al sidecar Python via stdin. Devuelve true si se pudo
+ * escribir; false si el sidecar no está disponible (el renderer puede avisar).
  */
-function sendToSidecar(msg: object) {
+function sendToSidecar(msg: object): boolean {
   if (sidecarProcess?.stdin?.writable) {
     sidecarProcess.stdin.write(JSON.stringify(msg) + '\n')
+    return true
   }
+  return false
 }
 
 /**
@@ -214,6 +344,17 @@ function handleSidecarMessage(msg: any) {
   if (!mainWindow) return
 
   switch (msg.type) {
+    case 'ready':
+      // El sidecar respondió el handshake: quedó operativo
+      sidecarState = 'ready'
+      sidecarRestarts = 0
+      pushDoctor()
+      break
+    case 'doctor':
+      // El sidecar reportó el estado de sus dependencias (yt-dlp, ffmpeg, ffprobe)
+      if (Array.isArray(msg.checks)) lastSidecarDoctor = msg.checks
+      pushDoctor()
+      break
     case 'progress':
       mainWindow.webContents.send('download:progress', msg)
       break
@@ -495,6 +636,9 @@ function setupIpc() {
     const result = await dialog.showSaveDialog(mainWindow!, options)
     return result
   })
+
+  // First-run doctor: reporte a demanda (el push llega por 'doctor:report')
+  ipcMain.handle('doctor:get', () => buildDoctorReport())
 }
 
 // Inicialización de la aplicación
@@ -502,6 +646,9 @@ app.whenReady().then(() => {
   setupIpc()
   createWindow()
   startSidecar()
+
+  // Difunde el reporte inicial del doctor apenas la ventana responde
+  mainWindow?.webContents.once('did-finish-load', () => pushDoctor())
 
   // Reanuda watchers de carpetas guardadas
   const rootFolders = store.get('rootFolders')

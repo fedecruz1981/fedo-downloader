@@ -13,6 +13,9 @@ declare global {
       deleteFile: (filePath: string) => Promise<any>
       openExternal: (url: string) => Promise<void>
       showSaveDialog: (options: any) => Promise<any>
+      getDoctor: () => Promise<any>
+      onDoctorReport: (callback: (report: any) => void) => () => void
+      onSidecarStatus: (callback: (status: any) => void) => () => void
       onDownloadProgress: (callback: (msg: any) => void) => () => void
       onDownloadComplete: (callback: (msg: any) => void) => () => void
       onDownloadError: (callback: (msg: any) => void) => () => void

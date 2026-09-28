@@ -15,11 +15,25 @@ Funciones:
 import sys
 import json
 import os
+import shutil
 import subprocess
 import threading
 import time
-import yt_dlp
-import ffmpeg
+
+# Imports opcionales: si el módulo falta, la app sigue viva y el doctor lo
+# reporta en vez de morir en silencio en el import.
+IMPORT_YTPLP = False
+IMPORT_FFMPEG_PY = False
+try:
+    import yt_dlp
+    IMPORT_YTPLP = True
+except ImportError:
+    pass
+try:
+    import ffmpeg
+    IMPORT_FFMPEG_PY = True
+except ImportError:
+    pass
 
 
 def log(msg):
@@ -325,8 +339,67 @@ def render_edit(job):
         })
 
 
+def doctor_report():
+    """Reporta el estado de las herramientas del sidecar al proceso principal."""
+    checks = []
+
+    checks.append({
+        'id': 'python',
+        'label': 'Python',
+        'required': True,
+        'status': 'ok',
+        'version': sys.version.split()[0],
+        'message': 'Python disponible.',
+        'hint': None,
+    })
+
+    ytdlp_version = None
+    if IMPORT_YTPLP:
+        try:
+            ytdlp_version = getattr(yt_dlp.version, '__version__', '?')
+        except Exception:
+            ytdlp_version = '?'
+    checks.append({
+        'id': 'yt-dlp',
+        'label': 'yt-dlp',
+        'required': True,
+        'status': 'ok' if IMPORT_YTPLP else 'missing',
+        'version': ytdlp_version,
+        'message': ('yt-dlp disponible.' if IMPORT_YTPLP
+                    else 'yt-dlp no está instalado en Python. Las descargas de YouTube fallarán.'),
+        'hint': None if IMPORT_YTPLP else 'https://github.com/yt-dlp/yt-dlp#installation',
+    })
+
+    for tool in ('ffmpeg', 'ffprobe'):
+        exe = shutil.which(tool)
+        version = None
+        missing = exe is None
+        if exe:
+            try:
+                res = subprocess.run([exe, '-version'], capture_output=True, text=True, timeout=10)
+                out = (res.stdout or res.stderr) or ''
+                version = out.strip().splitlines()[0] if out.strip() else None
+                missing = res.returncode != 0
+            except Exception:
+                missing = True
+        label = 'FFmpeg' if tool == 'ffmpeg' else 'FFprobe'
+        checks.append({
+            'id': tool,
+            'label': label,
+            'required': True,
+            'status': 'missing' if missing else 'ok',
+            'version': version,
+            'message': (label + ' disponible.' if not missing
+                        else label + ' no está en el PATH. Sin él, la conversión y el análisis de audio fallarán.'),
+            'hint': None if not missing else 'https://ffmpeg.org/download.html',
+        })
+
+    log({'type': 'doctor', 'checks': checks})
+
+
 def main():
     """Loop principal: lee comandos JSON de stdin y despacha a handlers en hilos separados"""
+    doctor_report()
     log({'type': 'ready'})
     for line in sys.stdin:
         line = line.strip()
@@ -336,10 +409,19 @@ def main():
             msg = json.loads(line)
             cmd = msg.get('cmd')
             if cmd == 'download':
+                if not IMPORT_YTPLP:
+                    log({'type': 'error', 'message': 'yt-dlp no está instalado. Ejecutá: pip install -U yt-dlp'})
+                    continue
                 threading.Thread(target=run_yt_dlp_download, args=(msg,), daemon=True).start()
             elif cmd == 'analyze':
+                if not IMPORT_FFMPEG_PY:
+                    log({'type': 'error', 'message': 'No se pudo analizar: ffmpeg-python no está instalado.'})
+                    continue
                 threading.Thread(target=analyze_audio, args=(msg,), daemon=True).start()
             elif cmd == 'render_edit':
+                if not IMPORT_FFMPEG_PY:
+                    log({'type': 'error', 'message': 'No se pudo renderizar: ffmpeg-python no está instalado.'})
+                    continue
                 threading.Thread(target=render_edit, args=(msg,), daemon=True).start()
             elif cmd == 'cancel':
                 # TODO: implementar cancelación real
