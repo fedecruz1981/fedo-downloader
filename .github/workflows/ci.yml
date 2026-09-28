@@ -33,6 +33,9 @@ jobs:
       - name: Compile electron main
         run: npm run compile:electron
 
+      - name: Smoke test (Electron)
+        run: npm run test:e2e
+
   sidecar-tests:
     runs-on: ubuntu-latest
     steps:
