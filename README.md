@@ -20,6 +20,8 @@ Aplicación de escritorio para descargar audio de YouTube, organizarlo y editarl
 
 ## Instalación
 
+Requiere **Node 24** (Vite 8 pide 20.19 o superior).
+
 ```bash
 # 1. Instalar dependencias de Node
 npm install
