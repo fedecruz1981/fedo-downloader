@@ -27,6 +27,15 @@ def log(msg):
     print(json.dumps(msg), flush=True)
 
 
+def _decode(raw):
+    """Decodifica bytes de ffmpeg a texto, tolerando salida None"""
+    if raw is None:
+        return ''
+    if isinstance(raw, bytes):
+        return raw.decode('utf-8', errors='replace')
+    return str(raw)
+
+
 def run_yt_dlp_download(job):
     """
     Descarga audio de YouTube usando yt-dlp y lo convierte al formato solicitado.
@@ -189,14 +198,15 @@ def measure_lufs(path):
     Primera pasada: medición, retorna input_i (integrated loudness).
     """
     try:
-        out, _ = (
+        # loudnorm imprime el JSON de medicion por stderr
+        _, stderr_raw = (
             ffmpeg
             .input(path)
             .filter('loudnorm', I=-14, TP=-1, LRA=11, print_format='json')
             .output('-', format='null')
             .run(capture_stdout=True, capture_stderr=True)
         )
-        stderr = out.decode('utf-8') if isinstance(out, bytes) else out
+        stderr = _decode(stderr_raw)
         # Extrae JSON del stderr
         import re
         match = re.search(r'\{.*\}', stderr, re.DOTALL)
@@ -213,14 +223,15 @@ def measure_peak_db(path):
     Mide nivel de pico en dB usando ffmpeg astats.
     """
     try:
-        out, _ = (
+        # astats escribe las estadisticas por stderr
+        _, stderr_raw = (
             ffmpeg
             .input(path)
             .filter('astats', metadata=1, reset=1)
             .output('-', format='null')
             .run(capture_stdout=True, capture_stderr=True)
         )
-        stderr = out.decode('utf-8') if isinstance(out, bytes) else out
+        stderr = _decode(stderr_raw)
         import re
         for line in stderr.split('\n'):
             if 'Peak level dB' in line:
@@ -247,38 +258,40 @@ def render_edit(job):
     format = job.get('outputFormat', 'wav')
 
     try:
-        # Construye cadena de filtros ffmpeg
+        # Construye cadena de filtros ffmpeg.
+        # `current_label` se mantiene SIN corchetes: se envuelve al usarlo como
+        # entrada de un filtro y una sola vez al mapearlo contra la salida.
         filters = []
         current_label = '0:a'
 
         for i, op in enumerate(operations):
             if op['type'] == 'trim':
                 filters.append(f"[{current_label}]atrim=start={op['startSec']}:end={op['endSec']},asetpts=PTS-STARTPTS[a{i}]")
-                current_label = f'[a{i}]'
+                current_label = f'a{i}'
             elif op['type'] == 'fadeIn':
                 filters.append(f"[{current_label}]afade=t=in:st=0:d={op['durationSec']}[a{i}]")
-                current_label = f'[a{i}]'
+                current_label = f'a{i}'
             elif op['type'] == 'fadeOut':
                 # Nota: fade out simple desde el final; para preciso se necesitaría duración previa
                 filters.append(f"[{current_label}]afade=t=out:st=0:d={op['durationSec']}[a{i}]")
-                current_label = f'[a{i}]'
+                current_label = f'a{i}'
             elif op['type'] == 'gain':
                 db = op['deltaDb']
                 filters.append(f"[{current_label}]volume={db}dB[a{i}]")
-                current_label = f'[a{i}]'
+                current_label = f'a{i}'
             elif op['type'] == 'normalize':
                 # Two-pass loudnorm para normalización LUFS precisa
                 filters.append(f"[{current_label}]loudnorm=I={op['targetLufs']}:TP=-1:LRA=11:print_format=summary[a{i}]")
-                current_label = f'[a{i}]'
+                current_label = f'a{i}'
             elif op['type'] == 'autoTrimSilence':
                 threshold = op['thresholdDb']
                 edges = op['edges']
                 if edges in ['start', 'both']:
                     filters.append(f"[{current_label}]silenceremove=start_periods=1:start_threshold={threshold}dB:start_duration=0.1[a{i}]")
-                    current_label = f'[a{i}]'
+                    current_label = f'a{i}'
                 if edges in ['end', 'both']:
                     filters.append(f"[{current_label}]areverse,silenceremove=start_periods=1:start_threshold={threshold}dB:start_duration=0.1,areverse[a{i}]")
-                    current_label = f'[a{i}]'
+                    current_label = f'a{i}'
 
         filter_complex = ';'.join(filters)
 
@@ -294,7 +307,7 @@ def render_edit(job):
         (
             ffmpeg
             .input(source)
-            .output(output, filter_complex=filter_complex, map=current_label, **out_args)
+            .output(output, filter_complex=filter_complex, map=f'[{current_label}]', **out_args)
             .overwrite_output()
             .run(capture_stdout=True, capture_stderr=True)
         )
