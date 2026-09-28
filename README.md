@@ -13,6 +13,7 @@ Portable para Windows (x64): un solo `.exe`, no se instala.
 
 | Versión | Archivo | Tamaño |
 |---------|---------|--------|
+| [1.0.2](https://github.com/fedecruz1981/fedo-downloader/releases/tag/v1.0.2) | `YTAudio.Studio.1.0.2.exe` | 96,3 MB |
 | [1.0.1](https://github.com/fedecruz1981/fedo-downloader/releases/tag/v1.0.1) | `YTAudio.Studio.1.0.1.exe` | 96,3 MB |
 
 [Todas las releases](https://github.com/fedecruz1981/fedo-downloader/releases) · [reportar un problema](https://github.com/fedecruz1981/fedo-downloader/issues)
