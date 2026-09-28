@@ -1,4 +1,4 @@
-# YTAudio Studio (fedo-dwnloader)
+# YTAudio Studio (fedo-downloader)
 
 Aplicación de escritorio para descargar audio de YouTube, organizarlo y editarlo inline.
 
@@ -48,18 +48,28 @@ npm run dev:electron
 npm run dev
 ```
 
+## Calidad
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint src
+```
+
 ## Construcción
 
 ```bash
 npm run build
 ```
 
-Genera instaladores en `dist/`.
+Genera instaladores en `dist/`. El script compila primero el renderer con Vite,
+después `electron/main.ts` + `electron/preload.ts` (los `.js` resultantes están
+en `.gitignore` y se generan siempre en el build) y recién ahí corre
+`electron-builder`.
 
 ## Estructura del proyecto
 
 ```
-fedo-dwnloader/
+fedo-downloader/
 ├── electron/              # Proceso principal de Electron
 │   ├── main.ts           # Entry point, IPC, file watcher, sidecar management
 │   └── preload.ts        # Bridge seguro main ↔ renderer
