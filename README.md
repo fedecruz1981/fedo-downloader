@@ -9,6 +9,8 @@ Aplicación de escritorio para descargar audio de YouTube, organizarlo y editarl
 
 ## Descargas
 
+**Windows x64 primero** — El instalador portable es para Windows x64 y requiere el runtime de .NET 8 (incluido en el `.exe`).
+
 Portable para Windows (x64): un solo `.exe`, no se instala.
 
 | Versión | Archivo | Tamaño |
@@ -17,6 +19,8 @@ Portable para Windows (x64): un solo `.exe`, no se instala.
 | [1.0.1](https://github.com/fedecruz1981/fedo-downloader/releases/tag/v1.0.1) | `YTAudio.Studio.1.0.1.exe` | 96,3 MB |
 
 [Todas las releases](https://github.com/fedecruz1981/fedo-downloader/releases) · [reportar un problema](https://github.com/fedecruz1981/fedo-downloader/issues)
+
+> **Aviso legal — YouTube**: Esta herramienta usa `yt-dlp` para descargar audio. Los Términos de Servicio de YouTube prohíben la descarga de contenido sin autorización expresa del titular de derechos. Úsala solo para contenido propio, de dominio público, o con licencia que lo permita (p. ej. Creative Commons). El autor no se responsabiliza del uso indebido.
 
 ## Características
 
