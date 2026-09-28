@@ -2,6 +2,11 @@
 
 Aplicación de escritorio para descargar audio de YouTube, organizarlo y editarlo inline.
 
+> La biblioteca de la captura es de audio sintético y la cola se simuló sin
+> llamar a la red: lo que se ve es la app real, con su flujo de descargas.
+
+![YTAudio Studio con la biblioteca filtrada por formato, la cola de descargas con un trabajo terminado, uno bajando al 63% y uno en cola, y el aviso de descarga completada](docs/captura.png)
+
 ## Descargas
 
 Portable para Windows (x64): un solo `.exe`, no se instala.

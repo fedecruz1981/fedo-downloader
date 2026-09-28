@@ -47,6 +47,19 @@ type EditOperation =
   | { type: 'autoTrimSilence'; thresholdDb: number; edges: 'start' | 'end' | 'both' }
 
 /**
+ * Suscribe un callback a un canal push del main process y devuelve la función
+ * de cleanup. El listener se conserva en una constante para que off() pueda
+ * quitarlo: ipcRenderer.off compara por referencia, asi que devolver una arrow
+ * nueva en el cleanup no desuscribiria nada.
+ */
+function subscribe(channel: string, callback: (msg: any) => void): () => void {
+  // Listener real, el mismo que se pasa a on y a off
+  const listener = (_e: unknown, msg: any) => callback(msg)
+  ipcRenderer.on(channel, listener)
+  return () => ipcRenderer.off(channel, listener)
+}
+
+/**
  * API expuesta al renderer (window.api)
  * Todas las funciones usan ipcRenderer.invoke (promesas) para requests
  * y ipcRenderer.on/off para eventos push del main process
@@ -80,35 +93,17 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   showSaveDialog: (options: any) => ipcRenderer.invoke('show-save-dialog', options),
 
-  // Eventos push del main process (retornan función de cleanup)
-  onDownloadProgress: (callback: (msg: any) => void) => {
-    ipcRenderer.on('download:progress', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('download:progress', (_e, msg) => callback(msg))
-  },
-  onDownloadComplete: (callback: (msg: any) => void) => {
-    ipcRenderer.on('download:complete', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('download:complete', (_e, msg) => callback(msg))
-  },
-  onDownloadError: (callback: (msg: any) => void) => {
-    ipcRenderer.on('download:error', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('download:error', (_e, msg) => callback(msg))
-  },
-  onFolderChanged: (callback: (msg: { path: string }) => void) => {
-    ipcRenderer.on('folder:changed', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('folder:changed', (_e, msg) => callback(msg))
-  },
-  onAnalysisComplete: (callback: (msg: any) => void) => {
-    ipcRenderer.on('analysis:complete', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('analysis:complete', (_e, msg) => callback(msg))
-  },
-  onRenderComplete: (callback: (msg: any) => void) => {
-    ipcRenderer.on('render:complete', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('render:complete', (_e, msg) => callback(msg))
-  },
-  onRenderError: (callback: (msg: any) => void) => {
-    ipcRenderer.on('render:error', (_e, msg) => callback(msg))
-    return () => ipcRenderer.off('render:error', (_e, msg) => callback(msg))
-  },
+  // Eventos push del main process (retornan función de cleanup).
+  // El listener se guarda en una constante porque off() compara por
+  // referencia: pasar una arrow nueva en el cleanup no quita nada y los
+  // listeners se acumulan en cada montaje del componente.
+  onDownloadProgress: (callback: (msg: any) => void) => subscribe('download:progress', callback),
+  onDownloadComplete: (callback: (msg: any) => void) => subscribe('download:complete', callback),
+  onDownloadError: (callback: (msg: any) => void) => subscribe('download:error', callback),
+  onFolderChanged: (callback: (msg: { path: string }) => void) => subscribe('folder:changed', callback),
+  onAnalysisComplete: (callback: (msg: any) => void) => subscribe('analysis:complete', callback),
+  onRenderComplete: (callback: (msg: any) => void) => subscribe('render:complete', callback),
+  onRenderError: (callback: (msg: any) => void) => subscribe('render:error', callback),
 })
 
 // Desarrollado por fedo-soft

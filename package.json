@@ -1,6 +1,6 @@
 {
   "name": "fedo-downloader",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "YTAudio Studio - YouTube Audio Downloader/Editor",
   "author": "federico-ariel-cruz",
   "main": "electron/main.js",
@@ -15,7 +15,8 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "captura": "node e2e/screenshot.mjs"
   },
   "dependencies": {
     "clsx": "^2.0.0",
