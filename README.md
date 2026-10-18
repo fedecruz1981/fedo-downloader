@@ -145,4 +145,17 @@ La config se guarda en `electron-store` (JSON local):
 
 ## Licencia
 
-MIT
+MIT — ver [`LICENSE`](./LICENSE).
+
+El instalador incluye componentes de terceros con sus propias licencias (Electron/Chromium, React,
+zustand, lucide y demás): están listados en [`THIRD-PARTY.md`](./THIRD-PARTY.md).
+
+## Aviso legal
+
+- **Sin relación con YouTube ni Google.** Este proyecto es independiente: no está afiliado a
+  YouTube, Google ni Alphabet, ni tiene su aval.
+- **Uso responsable.** Usalo solo con contenido propio, de dominio público o con licencia que
+  permita la descarga (ver el aviso de YouTube más arriba). Vos sos responsable del contenido que
+  procesás y del uso que le des.
+- **Sin garantías.** El software se entrega «tal cual», sin garantía de ningún tipo (ver
+  `LICENSE`).

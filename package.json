@@ -3,6 +3,7 @@
   "version": "1.0.3",
   "description": "YTAudio Studio - YouTube Audio Downloader/Editor",
   "author": "federico-ariel-cruz",
+  "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
